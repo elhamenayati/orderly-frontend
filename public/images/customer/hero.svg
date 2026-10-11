@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="DH©3 (ÌH*Ì">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8eeee"/>
+      <stop offset="100%" stop-color="#c97c84"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="900" cy="220" r="180" fill="#ffffff" fill-opacity="0.18"/>
+  <circle cx="260" cy="680" r="220" fill="#ffffff" fill-opacity="0.12"/>
+  <text x="600" y="470" text-anchor="middle" font-family="Tahoma, sans-serif" font-size="72" fill="#ffffff">DH©3 (ÌH*Ì</text>
+  <text x="600" y="540" text-anchor="middle" font-family="Tahoma, sans-serif" font-size="34" fill="#fff8f8">3'DF 2Ì('ÌÌ</text>
+</svg>
