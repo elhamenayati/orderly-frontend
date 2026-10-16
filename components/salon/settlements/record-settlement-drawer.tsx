@@ -13,8 +13,14 @@ import { Button } from "@/components/ui/button";
 import { StylistAvatar } from "@/components/salon/stylist-avatar";
 import { JalaliDateInput } from "@/components/ui/jalali-date-input";
 import {
+  groupThousands,
+  moneyInputDigits,
+  numberToPersianWords,
+} from "@/lib/format/money";
+import {
   activeStylistsForSettlement,
   balanceFavorLabel,
+  isSettlementDateFilterActive,
   loadSettlementReportData,
   projectBalanceAfterSettlement,
   recordStylistSettlementAsync,
@@ -78,12 +84,15 @@ export function RecordSettlementDrawer({
     void dataVersion;
     void localDataVersion;
     if (!stylistId) return null;
+    // Same scope as the settlements page, so the drawer's remaining matches the
+    // panel; the contract's settlement period would cover only one day for
+    // daily contracts.
     return stylistFinancialPosition(stylistId, {
-      periodStart: effectivePeriod.periodStart,
-      periodEnd: effectivePeriod.periodEnd,
-      scopedToDateFilter: false,
+      periodStart: pagePeriod.periodStart,
+      periodEnd: pagePeriod.periodEnd,
+      scopedToDateFilter: isSettlementDateFilterActive(pagePeriod),
     });
-  }, [stylistId, effectivePeriod, dataVersion, localDataVersion]);
+  }, [stylistId, pagePeriod, dataVersion, localDataVersion]);
 
   useEffect(() => {
     if (!open) return;
@@ -164,8 +173,8 @@ export function RecordSettlementDrawer({
     try {
       const result = await recordStylistSettlementAsync({
         stylistId: position.stylistId,
-        periodStart: position.periodStart,
-        periodEnd: position.periodEnd,
+        periodStart: effectivePeriod.periodStart,
+        periodEnd: effectivePeriod.periodEnd,
         direction,
         amount: parsedAmount,
         occurredAt,
@@ -316,12 +325,18 @@ export function RecordSettlementDrawer({
                 مبلغ (تومان) <span className="text-destructive">*</span>
               </span>
               <input
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="مثال: 2000000"
+                value={groupThousands(amount)}
+                onChange={(event) => setAmount(moneyInputDigits(event.target.value))}
+                placeholder="مثال: 2,000,000"
+                inputMode="numeric"
                 dir="ltr"
                 className={cn(fieldClassName, "text-start")}
               />
+              {parsedAmount > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {numberToPersianWords(parsedAmount)} تومان
+                </p>
+              ) : null}
             </label>
 
             <label className="block space-y-1.5">

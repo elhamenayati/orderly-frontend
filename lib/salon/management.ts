@@ -8,7 +8,12 @@ import {
 import { formatTimeDisplay } from "@/lib/salon/public-data";
 import { formatToman } from "@/lib/format/money";
 import { formatDuration } from "@/lib/format";
-import type { ContractType, Service, Stylist } from "@/types/domain";
+import type {
+  ContractType,
+  FinancialPeriod,
+  Service,
+  Stylist,
+} from "@/types/domain";
 
 const DAY_LABELS: Record<number, string> = {
   0: "یکشنبه",
@@ -95,6 +100,12 @@ function formatDayRange(days: number[]) {
   return sorted.map((day) => DAY_LABELS[day]).join("، ");
 }
 
+export const chairRentUnitLabels: Record<FinancialPeriod, string> = {
+  daily: "روز",
+  weekly: "هفته",
+  monthly: "ماه",
+};
+
 export function contractSummary(stylistId: string) {
   const contract = contractForStylist(stylistId);
   if (!contract) return "قرارداد فعال ثبت نشده";
@@ -104,7 +115,7 @@ export function contractSummary(stylistId: string) {
     return `${label} · سهم سالن ${contract.percentage}٪ · سهم آرایشگر ${100 - contract.percentage}٪`;
   }
   if (contract.type === "chair_rent" && contract.chairRent !== undefined) {
-    return `${label} · ${formatToman(contract.chairRent)} / روز کاری`;
+    return `${label} · ${formatToman(contract.chairRent)} / ${chairRentUnitLabels[contract.financialPeriod]}`;
   }
   if (contract.type === "fixed_salary" && contract.fixedSalary !== undefined) {
     return `${label} · ${formatToman(contract.fixedSalary)}`;

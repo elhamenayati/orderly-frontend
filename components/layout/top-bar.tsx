@@ -3,7 +3,7 @@
 import type { TabId } from "@/lib/salon/public-data";
 import { customerTabs, salon, salonPhoneHref } from "@/lib/salon/public-data";
 import { BookButton } from "@/components/customer/book-button";
-import { OrderlyLogo } from "@/components/icons/orderly-logo";
+import { AbrinakLogo } from "@/components/icons/abrinak-logo";
 import { MobileMenu } from "@/components/layout/mobile-menu";
 import { Phone, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ export function TopBar({ activeTab, onTabChange }: TopBarProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white/90 backdrop-blur-md">
       <div className="flex h-14 items-center px-4 lg:hidden">
-        <OrderlyLogo className="h-[3.4rem] shrink-0" />
+        <AbrinakLogo className="h-[3.4rem] shrink-0" />
         <p className="min-w-0 flex-1 truncate px-3 text-center text-base font-semibold">
           {salon.brandName}
         </p>
@@ -26,7 +26,7 @@ export function TopBar({ activeTab, onTabChange }: TopBarProps) {
 
       <div className="mx-auto hidden h-16 max-w-6xl items-center justify-between gap-3 px-6 lg:flex">
         <div className="flex min-w-0 items-center gap-2">
-          <OrderlyLogo className="h-[3.825rem] shrink-0" />
+          <AbrinakLogo className="h-[3.825rem] shrink-0" />
           <div className="min-w-0">
             <p className="truncate text-base font-semibold">{salon.brandName}</p>
             <p className="text-xs text-muted-foreground">سالن زیبایی</p>

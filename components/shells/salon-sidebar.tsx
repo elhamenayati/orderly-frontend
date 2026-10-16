@@ -17,7 +17,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { OrderlyLogo } from "@/components/icons/orderly-logo";
+import { AbrinakLogo } from "@/components/icons/abrinak-logo";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_MOTTO = "نرم افزار مدیریت سالن";
@@ -319,8 +319,9 @@ export function SalonSidebar() {
           href="/salon/bookings"
           className="flex flex-col items-center"
         >
-          <OrderlyLogo
+          <AbrinakLogo
             inverse
+            markOnly={collapsed}
             className={cn(
               collapsed ? "h-[3.4rem] w-[3.4rem] object-contain" : "h-[3.825rem]",
             )}

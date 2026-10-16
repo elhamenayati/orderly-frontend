@@ -26,6 +26,7 @@ import { fetchServices } from "@/lib/salon/services";
 import { fetchStylists } from "@/lib/salon/stylists";
 import { formatFaNumber } from "@/lib/format/number";
 import { ApiError } from "@/lib/api/client";
+import { usePersistentFilter } from "@/lib/salon/persistent-filters";
 import { clearSalonSession } from "@/lib/salon/auth";
 import type { BookingStatus } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
@@ -121,12 +122,24 @@ export function BookingsPage() {
     completed: 0,
     cancelled: 0,
   });
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">("all");
-  const [stylistFilter, setStylistFilter] = useState<string>("all");
-  const [customerQuery, setCustomerQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = usePersistentFilter<BookingStatus | "all">(
+    "bookings",
+    "status",
+    "all",
+  );
+  const [stylistFilter, setStylistFilter] = usePersistentFilter(
+    "bookings",
+    "stylist",
+    "all",
+  );
+  const [customerQuery, setCustomerQuery] = usePersistentFilter(
+    "bookings",
+    "query",
+    "",
+  );
+  const [dateFrom, setDateFrom] = usePersistentFilter("bookings", "dateFrom", "");
+  const [dateTo, setDateTo] = usePersistentFilter("bookings", "dateTo", "");
+  const [page, setPage] = usePersistentFilter("bookings", "page", 1);
   const [refreshKey, setRefreshKey] = useState(0);
 
   function showToast(message: string) {

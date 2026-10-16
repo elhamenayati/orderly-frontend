@@ -4,26 +4,38 @@ import {
   contractTypeLabels,
   stylistById,
 } from "@/lib/salon/management";
-import { fetchBookings } from "@/lib/salon/bookings";
 import { fetchStylists } from "@/lib/salon/stylists";
 import { fetchServices } from "@/lib/salon/services";
+import { fetchCustomers } from "@/lib/salon/customers";
 import {
   calculateContractObligation,
+  stylistAccrualEntries,
+  type AccrualEntry,
+  type AccrualKind,
   type ContractObligation,
   type SettlementPeriod,
 } from "@/lib/salon/contract-obligations";
+import { customerById, fetchBookings } from "@/lib/salon/bookings";
+import { bookings } from "@/mock_ts/bookings";
+import { formatToman } from "@/lib/format/money";
 import {
   defaultSettlementPeriodForContract,
   listSettlementPeriods,
 } from "@/lib/salon/financial-period";
 import { financialPeriodLabels } from "@/lib/salon/stylist-detail";
-import { shiftIsoDate, todayIso } from "@/lib/format/jalali";
+import {
+  formatJalaliShort,
+  isoToJalaliDateObject,
+  shiftIsoDate,
+  todayIso,
+} from "@/lib/format/jalali";
 import { stylistSettlementRecords } from "@/mock_ts/transactions";
 import { stylistContracts, stylists } from "@/mock_ts/stylists";
 import { DEMO_SALON_ID } from "@/mock_ts/salon";
 import { ApiError, apiFetch, isApiEnabled } from "@/lib/api/client";
 import type {
   ContractType,
+  FinancialPeriod,
   SettlementDirection,
   SettlementMethod,
   StylistContract,
@@ -58,14 +70,34 @@ export type StylistFinancialPosition = {
   cumulativePayable?: number;
   /** Prior unpaid stylist share carried into this period — percentage contracts only. */
   carriedBalance?: number;
-  chairRentWorkingDays?: number;
-  chairRentPerDay?: number;
+  chairRentCharges?: number;
+  chairRentRate?: number;
+  chairRentPeriod?: FinancialPeriod;
+};
+
+export type LedgerKind = "settlement" | AccrualKind;
+
+export const ledgerKindLabels: Record<LedgerKind, string> = {
+  settlement: "رکورد مالی",
+  booking: "رزرو",
+  chair_rent: "اجاره صندلی",
+  salary: "حقوق",
 };
 
 export type SettlementHistoryRow = {
-  record: StylistSettlementRecord;
-  directionLabel: string;
+  id: string;
+  /** ISO datetime; accruals use the start of their day */
+  occurredAt: string;
+  kind: LedgerKind;
+  kindLabel: string;
+  direction: SettlementDirection;
+  amount: number;
   methodLabel: string;
+  referenceNumber?: string;
+  description: string;
+  bookingId?: string;
+  /** Change to the balance (positive = more owed to the stylist). */
+  balanceEffect: number;
   balanceAfter: number;
 };
 
@@ -142,6 +174,11 @@ export function resolveSettlementPeriod(
     periodStart: filter.periodStart.trim() || earliest,
     periodEnd: filter.periodEnd.trim() || today,
   };
+}
+
+function syncAllSettlementRecords(items: StylistSettlementRecord[]) {
+  stylistSettlementRecords.length = 0;
+  stylistSettlementRecords.push(...items);
 }
 
 function syncSettlementRecordsForPeriod(
@@ -227,10 +264,19 @@ export async function fetchSettlementRecords(
         filters.periodEnd,
         items,
       );
-    } else {
+    } else if (
+      filters.stylistId ||
+      filters.occurredFrom ||
+      filters.occurredTo
+    ) {
+      // Partial filter – only upsert the returned subset
       for (const item of items) {
         upsertSettlementRecordToMock(item);
       }
+    } else {
+      // No filter at all → authoritative full-replace so the all-time
+      // view is always accurate (removes any records deleted server-side).
+      syncAllSettlementRecords(items);
     }
     return items;
   } catch (error) {
@@ -293,6 +339,7 @@ export async function loadSettlementReportData(
   await Promise.all([
     fetchStylists({ status: "active" }),
     fetchServices(),
+    fetchCustomers().catch(() => []),
     fetchBookings({
       status: "completed",
       ...(dateFilterActive
@@ -336,19 +383,19 @@ function cumulativePercentageObligation(
   contract: StylistContract,
   throughPeriod: SettlementPeriod,
 ) {
-  const periods = listSettlementPeriods(
-    contract,
-    contract.effectiveFrom,
-    throughPeriod.periodEnd,
-  );
+  const start = contract.effectiveFrom;
+  const periods = listSettlementPeriods(contract, start, throughPeriod.periodEnd);
 
   return periods.reduce((total, item) => {
-    const periodStart = obligationPeriodStart(contract.effectiveFrom, item);
+    const periodStart = obligationPeriodStart(start, item);
     const obligation = calculateContractObligation(stylistId, {
       periodStart,
-      periodEnd: item.periodEnd,
+      periodEnd:
+        item.periodEnd > throughPeriod.periodEnd
+          ? throughPeriod.periodEnd
+          : item.periodEnd,
     });
-    return total + obligation.payable;
+    return total + obligation.netObligation;
   }, 0);
 }
 
@@ -391,13 +438,14 @@ function openingBalanceForPercentagePeriod(
   contract: StylistContract,
   period: SettlementPeriod,
 ) {
+  const start = contract.effectiveFrom;
   const openingDate = shiftIsoDate(period.periodStart, -1);
-  if (openingDate < contract.effectiveFrom) {
+  if (openingDate < start) {
     return 0;
   }
 
   const cumulativeBefore = cumulativePercentageObligation(stylistId, contract, {
-    periodStart: contract.effectiveFrom,
+    periodStart: start,
     periodEnd: openingDate,
   });
   const priorRecords = settlementRecordsThrough(stylistId, openingDate);
@@ -468,9 +516,7 @@ export function stylistFinancialPosition(
   if (balance > 0) balanceDirection = "salon_to_stylist";
   if (balance < 0) balanceDirection = "stylist_to_salon";
 
-  const reportingStart = scopedToDateFilter
-    ? obligationStart
-    : contract?.effectiveFrom ?? obligationStart;
+  const reportingStart = obligationStart;
 
   return {
     stylistId,
@@ -501,49 +547,115 @@ export function stylistFinancialPosition(
     periodPayable: periodObligation.payable,
     cumulativePayable,
     carriedBalance,
-    chairRentWorkingDays: periodObligation.chairRentWorkingDays,
-    chairRentPerDay: periodObligation.chairRentPerDay,
+    chairRentCharges: periodObligation.chairRentCharges,
+    chairRentRate: periodObligation.chairRentRate,
+    chairRentPeriod: periodObligation.chairRentPeriod,
   };
 }
 
+function bookingEntryDescription(entry: AccrualEntry) {
+  const booking = bookings.find((item) => item.id === entry.bookingId);
+  const customer = booking ? customerById(booking.customerId) : undefined;
+  const parts = [
+    booking?.displayCode ? `رزرو ${booking.displayCode}` : null,
+    customer?.fullName ?? null,
+    `فروش ${formatToman(entry.sales)}`,
+  ];
+  const { contract } = entry;
+  if (contract.type === "percentage") {
+    parts.push(`سهم آرایشگر ${100 - (contract.percentage ?? 0)}٪`);
+  } else if (contract.type === "fixed_salary_plus_commission") {
+    parts.push(`پورسانت ${contract.commissionPercentage ?? 0}٪`);
+  } else if (contract.type === "fixed_salary") {
+    parts.push("درآمد سالن");
+  }
+  return parts.filter(Boolean).join(" · ");
+}
+
+function periodChargeDescription(entry: AccrualEntry) {
+  const title = entry.kind === "chair_rent" ? "اجاره صندلی" : "حقوق";
+  switch (entry.contract.financialPeriod) {
+    case "monthly":
+      return `${title} ${isoToJalaliDateObject(entry.date).format("MMMM YYYY")}`;
+    case "weekly":
+      return `${title} هفته ${formatJalaliShort(entry.date)}`;
+    default:
+      return `${title} روز ${formatJalaliShort(entry.date)}`;
+  }
+}
+
+function accrualToLedgerRow(entry: AccrualEntry): Omit<SettlementHistoryRow, "balanceAfter"> {
+  return {
+    id: entry.id,
+    occurredAt: `${entry.date}T00:00:00`,
+    kind: entry.kind,
+    kindLabel: ledgerKindLabels[entry.kind],
+    direction: entry.direction,
+    amount: entry.amount,
+    methodLabel: "—",
+    description:
+      entry.kind === "booking"
+        ? bookingEntryDescription(entry)
+        : periodChargeDescription(entry),
+    bookingId: entry.bookingId,
+    balanceEffect:
+      entry.direction === "salon_to_stylist" ? entry.amount : -entry.amount,
+  };
+}
+
+function settlementToLedgerRow(
+  record: StylistSettlementRecord,
+): Omit<SettlementHistoryRow, "balanceAfter"> {
+  return {
+    id: record.id,
+    occurredAt: record.occurredAt,
+    kind: "settlement",
+    kindLabel: ledgerKindLabels.settlement,
+    direction: record.direction,
+    amount: record.amount,
+    methodLabel: settlementMethodLabels[record.method],
+    referenceNumber: record.referenceNumber,
+    description: record.notes ?? "—",
+    balanceEffect:
+      record.direction === "salon_to_stylist" ? -record.amount : record.amount,
+  };
+}
+
+/**
+ * Bookings, chair rent, salary and recorded payments in one ledger, newest first.
+ * The running balance ends at the position's balance (positive = salon owes stylist).
+ */
 export function settlementHistoryRows(
   stylistId: string,
   input: StylistFinancialPositionInput,
 ): SettlementHistoryRow[] {
+  const position = stylistFinancialPosition(stylistId, input);
+  if (!position) return [];
+
   const scopedToDateFilter = input.scopedToDateFilter ?? false;
   const period = resolveSettlementPeriod(input);
-  const position = stylistFinancialPosition(stylistId, input);
-  const netObligation =
-    position?.cumulativePayable ??
-    position?.payable ??
-    calculateContractObligation(stylistId, period).netObligation;
+  const records = scopedToDateFilter
+    ? settlementRecordsInRange(stylistId, period)
+    : settlementRecordsThrough(stylistId, period.periodEnd);
+  const accruals = position.contractId
+    ? stylistAccrualEntries(stylistId, {
+        periodStart: position.periodStart,
+        periodEnd: position.periodEnd,
+      })
+    : [];
 
-  const records = (
-    scopedToDateFilter
-      ? settlementRecordsInRange(stylistId, period)
-      : settlementRecordsThrough(stylistId, period.periodEnd)
-  ).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const chronological = [
+    ...accruals.map(accrualToLedgerRow),
+    ...records.map(settlementToLedgerRow),
+  ].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
 
-  let settledToStylist = 0;
-  let settledFromStylist = 0;
-
-  const withBalance = records.map((record) => {
-    if (record.direction === "salon_to_stylist") {
-      settledToStylist += record.amount;
-    } else {
-      settledFromStylist += record.amount;
-    }
-    return {
-      record,
-      directionLabel: settlementDirectionLabels[record.direction],
-      methodLabel: settlementMethodLabels[record.method],
-      balanceAfter: netObligation - settledToStylist + settledFromStylist,
-    };
+  let balance = 0;
+  const withBalance = chronological.map((row) => {
+    balance += row.balanceEffect;
+    return { ...row, balanceAfter: balance };
   });
 
-  return withBalance.sort((a, b) =>
-    b.record.occurredAt.localeCompare(a.record.occurredAt),
-  );
+  return withBalance.reverse();
 }
 
 export function projectBalanceAfterSettlement(

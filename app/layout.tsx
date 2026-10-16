@@ -23,14 +23,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: env.appName,
   },
-  icons: {
-    icon: "/images/brand/logo.svg",
-    apple: "/images/brand/logo.svg",
-  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#C97C84",
+  themeColor: "#321a6b",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

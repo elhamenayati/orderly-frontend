@@ -1,3 +1,4 @@
+import { allocateBookingDisplayCode } from "@/lib/booking/display-code";
 import { normalizeDraftForSubmit } from "@/lib/booking/line-utils";
 import { finalConflictErrors, validateBookingDraft } from "@/lib/booking/validation";
 import { findBookingById } from "@/lib/booking/submit-guest";
@@ -106,6 +107,7 @@ export function submitSalonBooking(input: {
     id: bookingId,
     salonId: salon.id,
     customerId: draft.customerId!,
+    displayCode: allocateBookingDisplayCode(salon.id, now),
     bookingDate: draft.bookingDate,
     status: "confirmed",
     source: "salon",

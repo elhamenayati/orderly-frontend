@@ -14,7 +14,6 @@ import {
   Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { customerInitials } from "@/lib/salon/customers";
 import { clearSalonSession, readSalonSessionUser } from "@/lib/salon/auth";
 import { fetchSalonSettings } from "@/lib/salon/settings";
 import {
@@ -36,28 +35,17 @@ function UserAvatar({
   avatarPath?: string;
   className?: string;
 }) {
-  if (avatarPath) {
-    return (
-      <Image
-        src={avatarPath}
-        alt=""
-        width={44}
-        height={44}
-        className={cn("size-10 shrink-0 rounded-full object-cover", className)}
-      />
-    );
-  }
-
   return (
-    <div
+    <Image
+      src={avatarPath || "/images/salon/default-avatar.png"}
+      alt={name}
+      width={44}
+      height={44}
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary",
+        "size-10 shrink-0 rounded-full bg-white object-cover p-0.5",
         className,
       )}
-      aria-hidden
-    >
-      {customerInitials(name)}
-    </div>
+    />
   );
 }
 

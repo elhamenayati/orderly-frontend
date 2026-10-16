@@ -25,6 +25,7 @@ import {
 } from "@/lib/salon/services";
 import { formatFaNumber } from "@/lib/format/number";
 import { ApiError } from "@/lib/api/client";
+import { usePersistentFilter } from "@/lib/salon/persistent-filters";
 import { clearSalonSession } from "@/lib/salon/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,17 +82,29 @@ export function StylistsPage() {
   const [rows, setRows] = useState<Stylist[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
+  const [query, setQuery] = usePersistentFilter("stylists", "query", "");
+  const [statusFilter, setStatusFilter] = usePersistentFilter<
     "all" | "active" | "inactive"
-  >("all");
-  const [serviceFilter, setServiceFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [contractFilter, setContractFilter] = useState<
+  >("stylists", "status", "all");
+  const [serviceFilter, setServiceFilter] = usePersistentFilter(
+    "stylists",
+    "service",
+    "all",
+  );
+  const [categoryFilter, setCategoryFilter] = usePersistentFilter(
+    "stylists",
+    "category",
+    "all",
+  );
+  const [contractFilter, setContractFilter] = usePersistentFilter<
     ContractType | "all" | "none"
-  >("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  >("stylists", "contract", "all");
+  const [page, setPage] = usePersistentFilter("stylists", "page", 1);
+  const [pageSize, setPageSize] = usePersistentFilter(
+    "stylists",
+    "pageSize",
+    PAGE_SIZE,
+  );
 
   function showToast(message: string) {
     setToast(message);

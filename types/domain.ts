@@ -119,6 +119,7 @@ export type Booking = {
   id: string;
   salonId: string;
   customerId: string;
+  displayCode?: string;
   bookingDate: string;
   status: BookingStatus;
   source: "guest" | "salon";

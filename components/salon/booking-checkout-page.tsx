@@ -25,6 +25,7 @@ import { formatTimeDisplay } from "@/lib/salon/public-data";
 import { ApiError } from "@/lib/api/client";
 import { clearSalonSession } from "@/lib/salon/auth";
 import type { Booking, PaymentTransaction } from "@/types/domain";
+import { BookingStepsNav } from "@/components/salon/booking/booking-steps-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -215,6 +216,8 @@ export function BookingCheckoutPage({ bookingId }: { bookingId: string }) {
           </p>
         </div>
       </div>
+
+      <BookingStepsNav activeStep={4} />
 
       <Card className="shadow-none">
         <CardContent className="space-y-2 text-sm">

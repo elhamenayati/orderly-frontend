@@ -2,6 +2,9 @@ import { resolveMediaUrl } from "@/lib/api/client";
 
 const STORAGE_KEY = "mahoura:stylistAvatarPaths";
 
+/** Default avatar when a stylist/user has no uploaded profile picture. */
+export const DEFAULT_AVATAR_PATH = "/images/salon/default-avatar.png";
+
 export function readStylistAvatarOverrides(): Record<string, string> {
   if (typeof window === "undefined") return {};
   try {
@@ -28,7 +31,7 @@ export function resolveStylistAvatarPath(
 }
 
 /** Turn stored stylist avatar paths into browser-loadable URLs. */
-export function stylistAvatarSrc(path?: string): string | undefined {
-  if (!path) return undefined;
-  return resolveMediaUrl(path);
+export function stylistAvatarSrc(path?: string | null): string {
+  if (!path?.trim()) return DEFAULT_AVATAR_PATH;
+  return resolveMediaUrl(path) || DEFAULT_AVATAR_PATH;
 }

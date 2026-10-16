@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarCheck, Loader2, Plus, Save } from "lucide-react";
@@ -20,8 +20,13 @@ import {
   submitSalonBookingAsync,
   updateSalonBookingAsync,
 } from "@/lib/booking/submit-salon";
+import {
+  displayedMinimumDeposit,
+  estimatedTotal,
+} from "@/lib/booking/totals";
 import { validateBookingDraft } from "@/lib/booking/validation";
-import { defaultBookingDateIso } from "@/lib/format/jalali";
+import { formatPrice } from "@/lib/format";
+import { salon } from "@/mock_ts/salon";
 import { fetchBookingById, fetchBookings } from "@/lib/salon/bookings";
 import { fetchCustomers } from "@/lib/salon/customers";
 import {
@@ -32,10 +37,15 @@ import { fetchServiceCategories, fetchServices } from "@/lib/salon/services";
 import { fetchStylists } from "@/lib/salon/stylists";
 import { ApiError, isApiEnabled } from "@/lib/api/client";
 import { clearSalonSession } from "@/lib/salon/auth";
+import { BookingStepsNav } from "@/components/salon/booking/booking-steps-nav";
 import { BookingSummarySidebar } from "@/components/salon/booking/booking-summary-sidebar";
 import { CustomerPickerSection } from "@/components/salon/booking/customer-picker-section";
 import { JalaliDateField } from "@/components/salon/booking/jalali-date-field";
 import { ServiceLinesTable } from "@/components/salon/booking/service-lines-table";
+import {
+  getBookingFormActiveStep,
+  hasCompleteServiceLine,
+} from "@/lib/salon/booking-steps";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { BookingDraft, BookingServiceDraft } from "@/types/booking";
@@ -62,14 +72,25 @@ function mapSubmitErrors(errors: string[]) {
     .join(" · ");
 }
 
-function StepHeader({ step, title }: { step: number; title: string }) {
+function StepSection({
+  enabled,
+  children,
+  className,
+}: {
+  enabled: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mb-4 flex items-start gap-3">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-        {step}
-      </span>
-      <h2 className="text-base font-semibold">{title}</h2>
-    </div>
+    <section
+      className={cn(
+        "rounded-2xl border border-border bg-card p-5",
+        !enabled && "opacity-50",
+        className,
+      )}
+    >
+      {children}
+    </section>
   );
 }
 
@@ -87,13 +108,14 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
   );
   const [draft, setDraft] = useState<BookingDraft>(() => ({
     customerId: prefillCustomerId,
-    bookingDate: defaultBookingDateIso(),
+    bookingDate: "",
     notes: "",
     lines: [createEmptyLine(`line-${crypto.randomUUID()}`)],
   }));
   const [catalogReady, setCatalogReady] = useState(false);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +168,18 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
   }, [mode, bookingId]);
 
   const checkedDraft = useMemo(() => recheckAllLines(draft), [draft, catalogReady]);
-  const canConfigureServices = Boolean(draft.customerId && draft.bookingDate);
+  const isEditPrefilled = mode === "edit";
+  const step1Enabled = true;
+  const step2Enabled = isEditPrefilled || Boolean(draft.customerId);
+  const step3Enabled =
+    isEditPrefilled || Boolean(draft.customerId && draft.bookingDate);
+  const step4Enabled =
+    isEditPrefilled ||
+    (step3Enabled && hasCompleteServiceLine(checkedDraft));
+  const canConfigureServices = step3Enabled;
+  const deposit = displayedMinimumDeposit(checkedDraft.lines);
+  const total = estimatedTotal(checkedDraft.lines);
+  const activeStep = getBookingFormActiveStep(checkedDraft, mode);
 
   if (loading) {
     return (
@@ -199,6 +232,28 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
     setDraft(checked);
   }
 
+  function handleBookingDateChange(bookingDate: string) {
+    void (async () => {
+      if (isApiEnabled()) {
+        try {
+          await fetchBookings({
+            dateFrom: bookingDate,
+            dateTo: bookingDate,
+          });
+        } catch {
+          setFormError("بارگذاری رزروهای این تاریخ با خطا مواجه شد");
+          return;
+        }
+      }
+
+      updateDraft({
+        ...draftRef.current,
+        bookingDate,
+        lines: draftRef.current.lines.map((line) => updateLineStartTime(line, null)),
+      });
+    })();
+  }
+
   function updateLine(clientId: string, line: BookingServiceDraft) {
     if (line.serviceId) {
       const service = findService(line.serviceId);
@@ -240,58 +295,72 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
   }
 
   async function handleSubmit() {
+    // Synchronous re-entrancy guard: blocks a second click during the
+    // `fetchBookings` round-trip (before `submitting` state disables the
+    // button), which would otherwise fire a duplicate create and surface a
+    // false overlap error from the server for the just-created booking.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     setFormError(null);
+    // Stays locked after success: the booking now exists on the server, and a
+    // resubmit during navigation would be rejected as overlapping it.
+    let saved = false;
 
-    const sourceDraft =
-      mode === "edit" && existingBooking
-        ? { ...draftRef.current, bookingId: existingBooking.id }
-        : draftRef.current;
+    try {
+      const sourceDraft =
+        mode === "edit" && existingBooking
+          ? { ...draftRef.current, bookingId: existingBooking.id }
+          : draftRef.current;
 
-    if (isApiEnabled()) {
-      try {
-        await fetchBookings({
-          dateFrom: sourceDraft.bookingDate,
-          dateTo: sourceDraft.bookingDate,
-        });
-      } catch {
-        setFormError("بارگذاری رزروهای این تاریخ با خطا مواجه شد");
+      if (isApiEnabled()) {
+        try {
+          await fetchBookings({
+            dateFrom: sourceDraft.bookingDate,
+            dateTo: sourceDraft.bookingDate,
+          });
+        } catch {
+          setFormError("بارگذاری رزروهای این تاریخ با خطا مواجه شد");
+          return;
+        }
+      }
+
+      const nextDraft = recheckAllLines(normalizeDraftForSubmit(sourceDraft));
+      draftRef.current = nextDraft;
+      setDraft(nextDraft);
+
+      const lineIssue = describeSubmitLineIssues(nextDraft);
+      if (lineIssue) {
+        setFormError(lineIssue);
         return;
       }
+
+      const validationErrors = validateBookingDraft(nextDraft);
+      if (validationErrors.length > 0) {
+        setFormError(mapSubmitErrors(validationErrors));
+        return;
+      }
+
+      const result =
+        mode === "edit" && existingBooking
+          ? await updateSalonBookingAsync({
+              draft: { ...nextDraft, bookingId: existingBooking.id },
+            })
+          : await submitSalonBookingAsync({ draft: nextDraft });
+
+      if (!result.ok) {
+        setFormError(mapSubmitErrors(result.errors));
+        return;
+      }
+
+      saved = true;
+      router.push(`/salon/bookings/${result.bookingId}`);
+    } finally {
+      if (!saved) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
-
-    const nextDraft = recheckAllLines(normalizeDraftForSubmit(sourceDraft));
-    draftRef.current = nextDraft;
-    setDraft(nextDraft);
-
-    const lineIssue = describeSubmitLineIssues(nextDraft);
-    if (lineIssue) {
-      setFormError(lineIssue);
-      return;
-    }
-
-    const validationErrors = validateBookingDraft(nextDraft);
-    if (validationErrors.length > 0) {
-      setFormError(mapSubmitErrors(validationErrors));
-      return;
-    }
-
-    setSubmitting(true);
-
-    const result =
-      mode === "edit" && existingBooking
-        ? await updateSalonBookingAsync({
-            draft: { ...nextDraft, bookingId: existingBooking.id },
-          })
-        : await submitSalonBookingAsync({ draft: nextDraft });
-
-    setSubmitting(false);
-
-    if (!result.ok) {
-      setFormError(mapSubmitErrors(result.errors));
-      return;
-    }
-
-    router.push(`/salon/bookings/${result.bookingId}`);
   }
 
   return (
@@ -307,86 +376,116 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
         </p>
       </div>
 
+      <BookingStepsNav activeStep={activeStep} />
+
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <div className="space-y-8">
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <StepHeader step={1} title="انتخاب مشتری" />
+          <StepSection enabled={step1Enabled}>
             <CustomerPickerSection
               customerId={draft.customerId}
               onSelect={(customerId) =>
                 updateDraft({ ...draft, customerId })
               }
+              aside={
+                <JalaliDateField
+                  compact
+                  value={draft.bookingDate}
+                  onChange={handleBookingDateChange}
+                  disabled={!step2Enabled}
+                />
+              }
             />
-          </section>
+          </StepSection>
 
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <StepHeader step={2} title="انتخاب تاریخ" />
-            <JalaliDateField
-              value={draft.bookingDate}
-              onChange={(bookingDate) => {
-                void (async () => {
-                  if (isApiEnabled()) {
-                    try {
-                      await fetchBookings({
-                        dateFrom: bookingDate,
-                        dateTo: bookingDate,
-                      });
-                    } catch {
-                      setFormError("بارگذاری رزروهای این تاریخ با خطا مواجه شد");
-                      return;
-                    }
-                  }
-
-                  updateDraft({
-                    ...draftRef.current,
-                    bookingDate,
-                    lines: draftRef.current.lines.map((line) =>
-                      updateLineStartTime(line, null),
-                    ),
-                  });
-                })();
-              }}
-            />
-          </section>
-
-          <section
-            className={cn(
-              "rounded-2xl border border-border bg-card p-5",
-              !canConfigureServices && "opacity-60",
-            )}
-          >
-            <div className="mb-4 space-y-3">
-              <StepHeader step={3} title="انتخاب خدمات" />
+          <StepSection enabled={step3Enabled}>
+            <div className={cn("space-y-4", !step3Enabled && "pointer-events-none")}>
               <div className="flex justify-start">
                 <Button
                   type="button"
                   variant="outline"
                   className="rounded-xl"
                   onClick={addLine}
-                  disabled={!canConfigureServices}
+                  disabled={!step3Enabled}
                 >
                   <Plus className="size-4" />
                   افزودن خدمت
                 </Button>
               </div>
+
+              {!step3Enabled ? (
+                <p className="text-sm text-muted-foreground">
+                  ابتدا مشتری و تاریخ رزرو را انتخاب کنید.
+                </p>
+              ) : null}
+
+              <ServiceLinesTable
+                draft={checkedDraft}
+                lineCategories={lineCategories}
+                onLineCategoriesChange={setLineCategories}
+                onLineChange={updateLine}
+                onRemoveLine={removeLine}
+                disabled={!step3Enabled}
+                catalogReady={catalogReady}
+              />
             </div>
+          </StepSection>
 
-            {!canConfigureServices ? (
-              <p className="mb-4 text-sm text-muted-foreground">
-                ابتدا مشتری و تاریخ رزرو را انتخاب کنید.
-              </p>
-            ) : null}
+          <StepSection enabled={step4Enabled}>
+            <div className={cn("space-y-5", !step4Enabled && "pointer-events-none")}>
+              {!step4Enabled ? (
+                <p className="text-sm text-muted-foreground">
+                  پس از تکمیل حداقل یک خدمت، شرایط کنسلی و تسویه نمایش داده می‌شود.
+                </p>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                      <p className="font-medium">جمع مبلغ تخمینی</p>
+                      <p className="mt-1 text-xl font-bold text-primary">
+                        {formatPrice(total)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                      <p className="font-medium">حداقل ودیعه (نمایشی)</p>
+                      <p className="mt-1 text-xl font-bold">{formatPrice(deposit)}</p>
+                      <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                        ودیعه در این نسخه فقط نمایش داده می‌شود و آنلاین دریافت
+                        نمی‌شود.
+                      </p>
+                    </div>
+                  </div>
 
-            <ServiceLinesTable
-              draft={checkedDraft}
-              lineCategories={lineCategories}
-              onLineCategoriesChange={setLineCategories}
-              onLineChange={updateLine}
-              onRemoveLine={removeLine}
-              disabled={!canConfigureServices}
-              catalogReady={catalogReady}
-            />
-          </section>
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium">قوانین کنسلی</p>
+                    <p className="leading-7 text-muted-foreground">
+                      {salon.cancellationPolicy ||
+                        "سیاست لغو برای این سالن ثبت نشده است."}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="booking-notes"
+                      className="text-sm font-medium"
+                    >
+                      یادداشت (اختیاری)
+                    </label>
+                    <textarea
+                      id="booking-notes"
+                      value={draft.notes}
+                      onChange={(event) =>
+                        updateDraft({ ...draft, notes: event.target.value })
+                      }
+                      rows={3}
+                      placeholder="یادداشت داخلی برای این رزرو..."
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      disabled={!step4Enabled}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </StepSection>
 
           {formError ? (
             <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -407,7 +506,7 @@ export function SalonBookingForm({ mode, bookingId }: SalonBookingFormProps) {
             <Button
               type="button"
               className="min-w-40"
-              disabled={submitting || !canConfigureServices}
+              disabled={submitting || !step4Enabled}
               onClick={handleSubmit}
             >
               {mode === "create" ? (

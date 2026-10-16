@@ -1,13 +1,13 @@
 {
-  "name": "لوکس بیوتی",
-  "short_name": "لوکس بیوتی",
-  "description": "رزرو خدمات سالن زیبایی لوکس بیوتی",
+  "name": "ابرینک",
+  "short_name": "ابرینک",
+  "description": "ابرینک، نرم‌افزار مدیریت سالن زیبایی",
   "start_url": "/",
   "display": "standalone",
   "dir": "rtl",
   "lang": "fa",
-  "background_color": "#FBF7F7",
-  "theme_color": "#C97C84",
+  "background_color": "#FFFFFF",
+  "theme_color": "#321a6b",
   "icons": [
     {
       "src": "/icon-192.png",

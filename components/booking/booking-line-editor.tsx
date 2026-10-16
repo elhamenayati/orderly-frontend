@@ -38,7 +38,7 @@ export function BookingLineEditor({
 }: BookingLineEditorProps) {
   const services = getActiveServices();
   const readyStylists = line.serviceId
-    ? bookingReadyStylistsForService(line.serviceId)
+    ? bookingReadyStylistsForService(line.serviceId, draft.bookingDate)
     : [];
 
   const duration = line.reservedDurationMinutes ?? 0;

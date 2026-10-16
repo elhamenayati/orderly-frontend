@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  DEFAULT_AVATAR_PATH,
   resolveStylistAvatarPath,
   stylistAvatarSrc,
 } from "@/lib/salon/stylist-avatar";
@@ -30,43 +31,36 @@ export function StylistAvatar({
   name,
   size = "sm",
   className,
-  fallbackClassName,
 }: StylistAvatarProps) {
-  const [displayPath, setDisplayPath] = useState(avatarPath);
+  const [displayPath, setDisplayPath] = useState(
+    avatarPath || DEFAULT_AVATAR_PATH,
+  );
 
   useEffect(() => {
     if (!stylistId) {
-      setDisplayPath(avatarPath);
+      setDisplayPath(avatarPath || DEFAULT_AVATAR_PATH);
       return;
     }
-    setDisplayPath(resolveStylistAvatarPath(stylistId, avatarPath) ?? avatarPath);
+    setDisplayPath(
+      resolveStylistAvatarPath(stylistId, avatarPath) ||
+        avatarPath ||
+        DEFAULT_AVATAR_PATH,
+    );
   }, [stylistId, avatarPath]);
 
-  const src = displayPath ? stylistAvatarSrc(displayPath) : undefined;
+  const src = stylistAvatarSrc(displayPath);
   const sizeClass = sizeClasses[size];
 
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={name}
-        className={cn(sizeClass, "shrink-0 rounded-full object-cover", className)}
-      />
-    );
-  }
-
   return (
-    <span
-      aria-hidden
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name}
       className={cn(
         sizeClass,
-        "flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary",
-        fallbackClassName,
+        "shrink-0 rounded-full bg-white object-cover p-0.5",
         className,
       )}
-    >
-      {name.trim().slice(0, 1) || "?"}
-    </span>
+    />
   );
 }

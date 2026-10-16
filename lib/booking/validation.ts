@@ -33,7 +33,7 @@ export function validateBookingLine(
   }
 
   if (line.serviceId && line.stylistId) {
-    if (!isBookingReadyStylist(line.stylistId, line.serviceId)) {
+    if (!isBookingReadyStylist(line.stylistId, line.serviceId, bookingDate)) {
       errors.push("stylist_not_booking_ready");
     }
   }

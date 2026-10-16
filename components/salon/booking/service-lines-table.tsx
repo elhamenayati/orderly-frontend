@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { GripVertical, Trash2 } from "lucide-react";
+import { StylistAvatar } from "@/components/salon/stylist-avatar";
 import { bookingReadyStylistsForService } from "@/lib/booking/catalog";
 import {
   describeTimeSlotBlocker,
@@ -124,7 +124,7 @@ function ServiceLineRow({
 }) {
   const categoryServices = listActiveServices(categoryId);
   const readyStylists = line.serviceId
-    ? bookingReadyStylistsForService(line.serviceId)
+    ? bookingReadyStylistsForService(line.serviceId, draft.bookingDate)
     : [];
   const duration = line.reservedDurationMinutes ?? 0;
 
@@ -240,15 +240,23 @@ function ServiceLineRow({
         </select>
         {line.stylistId ? (
           <div className="mt-2 flex items-center gap-2">
-            <Image
-              src="/images/salon/stylist-placeholder.svg"
-              alt=""
-              width={24}
-              height={24}
-              className="size-6 rounded-full"
+            <StylistAvatar
+              stylistId={line.stylistId}
+              avatarPath={
+                readyStylists.find((item) => item.id === line.stylistId)
+                  ?.avatarPath
+              }
+              name={
+                readyStylists.find((item) => item.id === line.stylistId)
+                  ?.displayName ?? ""
+              }
+              size="xs"
             />
             <span className="text-xs text-muted-foreground">
-              {readyStylists.find((item) => item.id === line.stylistId)?.displayName}
+              {
+                readyStylists.find((item) => item.id === line.stylistId)
+                  ?.displayName
+              }
             </span>
           </div>
         ) : null}

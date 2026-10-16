@@ -27,7 +27,9 @@ import { fetchStylists } from "@/lib/salon/stylists";
 import { transactionKindLabels } from "@/lib/salon/reports";
 import { ApiError } from "@/lib/api/client";
 import { clearSalonSession } from "@/lib/salon/auth";
+import { BookingStepsNav } from "@/components/salon/booking/booking-steps-nav";
 import { CancelBookingDialog } from "@/components/salon/booking/cancel-booking-dialog";
+import { getBookingDetailActiveStep } from "@/lib/salon/booking-steps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -205,6 +207,8 @@ export function BookingDetailPage({ bookingId }: { bookingId: string }) {
           <Badge variant="outline">{bookingSourceLabels[booking.source]}</Badge>
         </div>
       </div>
+
+      <BookingStepsNav activeStep={getBookingDetailActiveStep(booking.status)} />
 
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <div>

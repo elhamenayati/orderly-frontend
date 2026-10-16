@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/run-surface.cjs marketing dev",
+    "dev:customer": "node scripts/run-surface.cjs customer dev",
+    "build": "node scripts/run-surface.cjs marketing build",
+    "build:customer": "node scripts/run-surface.cjs customer build",
+    "start": "node scripts/run-surface.cjs marketing start",
+    "start:customer": "node scripts/run-surface.cjs customer start",
     "lint": "eslint"
   },
   "dependencies": {

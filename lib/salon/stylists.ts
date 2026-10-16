@@ -186,7 +186,7 @@ function mockCreateStylist(input: StylistInput): Stylist {
     salonId: DEMO_SALON_ID,
     displayName: input.displayName.trim(),
     mobile: input.mobile.trim(),
-    avatarPath: input.avatarPath ?? "/images/salon/stylist-placeholder.svg",
+    avatarPath: input.avatarPath ?? "/images/salon/default-avatar.png",
     gender: input.gender,
     description: input.description?.trim() || undefined,
     isActive: input.isActive ?? true,

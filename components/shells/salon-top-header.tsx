@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Home } from "lucide-react";
-import { OrderlyLogo } from "@/components/icons/orderly-logo";
+import { AbrinakLogo } from "@/components/icons/abrinak-logo";
 import { SalonHeaderToolbar } from "@/components/shells/salon-header-toolbar";
 
 function SalonHeaderFrame({
@@ -19,7 +19,7 @@ function SalonHeaderFrame({
       <div className="flex shrink-0 items-center gap-2">
         <SalonHeaderToolbar />
         {showMobileLogo ? (
-          <OrderlyLogo className="h-12 shrink-0 opacity-90 lg:hidden" />
+          <AbrinakLogo className="h-12 shrink-0 opacity-90 lg:hidden" />
         ) : null}
       </div>
     </header>

@@ -16,7 +16,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { contractTypeLabels } from "@/lib/salon/management";
+import { chairRentUnitLabels, contractTypeLabels } from "@/lib/salon/management";
 import { formatDuration } from "@/lib/format";
 import { formatJalaliShort, isoDateFromDate } from "@/lib/format/jalali";
 import { formatToman } from "@/lib/format/money";
@@ -945,7 +945,7 @@ export function StylistDetailPage({
                   ) : null}
                   {activeContract.type === "chair_rent" ? (
                     <InfoRow
-                      label="اجاره صندلی (هر روز کاری)"
+                      label={`اجاره صندلی (هر ${chairRentUnitLabels[activeContract.financialPeriod]})`}
                       value={formatToman(activeContract.chairRent ?? 0)}
                     />
                   ) : null}
@@ -1257,7 +1257,9 @@ function ContractForm({
 
       {value.type === "chair_rent" ? (
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">اجاره صندلی به ازای هر روز کاری (تومان)</span>
+          <span className="text-sm font-medium">
+            اجاره صندلی به ازای هر {chairRentUnitLabels[value.financialPeriod]} (تومان)
+          </span>
           <input
             inputMode="numeric"
             value={value.chairRent ?? ""}

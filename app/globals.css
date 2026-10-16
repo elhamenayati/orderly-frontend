@@ -138,7 +138,34 @@
   --sidebar-ring: #7a6db8;
 }
 
-body:has([data-shell="salon"]) {
+/* Public marketing landing — aligned with salon brand tokens */
+[data-shell="marketing"] {
+  --font-sans: "Dana", var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Dana", var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  font-family: "Dana", var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --background: #f5f4fa;
+  --foreground: #0d0530;
+  --card: #ffffff;
+  --card-foreground: #0d0530;
+  --popover: #ffffff;
+  --popover-foreground: #0d0530;
+  --primary: #15084b;
+  --primary-foreground: #ffffff;
+  --secondary: #ebe9f5;
+  --secondary-foreground: #0d0530;
+  --muted: #f0eef7;
+  --muted-foreground: #5c5878;
+  --accent: #ebe9f5;
+  --accent-foreground: #15084b;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #d5d0e8;
+  --input: #d5d0e8;
+  --ring: #15084b;
+  --radius: 5px;
+}
+
+body:has([data-shell="salon"]),
+body:has([data-shell="marketing"]) {
   --radius: 5px;
 }
 

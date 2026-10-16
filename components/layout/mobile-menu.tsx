@@ -11,7 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { OrderlyLogo } from "@/components/icons/orderly-logo";
+import { AbrinakLogo } from "@/components/icons/abrinak-logo";
 import { Menu } from "lucide-react";
 
 type MobileMenuProps = {
@@ -39,7 +39,7 @@ export function MobileMenu({ activeTab, onTabChange }: MobileMenuProps) {
       <SheetContent side="left" className="w-[280px] bg-white">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <OrderlyLogo className="h-12" />
+            <AbrinakLogo className="h-12" />
             {salon.brandName}
           </SheetTitle>
         </SheetHeader>

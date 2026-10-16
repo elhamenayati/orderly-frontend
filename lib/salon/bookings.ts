@@ -1,3 +1,4 @@
+import { formatBookingDisplayCode } from "@/lib/booking/display-code";
 import { findService } from "@/lib/booking/catalog";
 import { salesAmount } from "@/lib/booking/totals";
 import { ApiError, apiFetch, isApiEnabled } from "@/lib/api/client";
@@ -365,7 +366,7 @@ export function bookingListRows(options?: BookingListFilters) {
       const lines = bookingLineSummary(booking);
       return {
         booking,
-        displayId: bookingDisplayId(booking),
+        displayId: formatBookingDisplayCode(booking),
         customerName: customerDisplayName(booking.customerId),
         customerMobile: customerMobile(booking.customerId),
         bookingDateLabel: formatJalaliShort(booking.bookingDate),
@@ -395,27 +396,8 @@ export function activeStylistsForFilter() {
   return stylists.filter((stylist) => stylist.isActive);
 }
 
-function bookingDisplayId(booking: Booking) {
-  const year = isoToJalaliYear(booking.bookingDate);
-  const suffix = booking.id
-    .replace(/[^a-z0-9]/gi, "")
-    .slice(-5)
-    .toUpperCase()
-    .padStart(5, "0");
-  return `${year}-${suffix}`;
-}
-
 export function formatBookingDisplayId(booking: Booking) {
-  return bookingDisplayId(booking);
-}
-
-function isoToJalaliYear(isoDate: string) {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const gregorian = new Date(year, month - 1, day);
-  const persianYear = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-    year: "numeric",
-  }).format(gregorian);
-  return persianYear.replace(/[^\d]/g, "");
+  return formatBookingDisplayCode(booking);
 }
 
 export function bookingLineSummary(booking: Booking) {

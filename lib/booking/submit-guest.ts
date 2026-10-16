@@ -1,3 +1,4 @@
+import { allocateBookingDisplayCode } from "@/lib/booking/display-code";
 import { env } from "@/config/env";
 import { finalConflictErrors, validateBookingDraft } from "@/lib/booking/validation";
 import { bookings } from "@/mock_ts/bookings";
@@ -100,6 +101,7 @@ export function submitGuestBooking(input: {
     id: bookingId,
     salonId: salon.id,
     customerId: customer.id,
+    displayCode: allocateBookingDisplayCode(salon.id, now),
     bookingDate: draftWithCustomer.bookingDate,
     status: "confirmed",
     source: "guest",

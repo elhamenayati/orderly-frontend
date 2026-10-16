@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  balanceFavorLabel,
   contractTypeFilterOptions,
   isSettlementDateFilterActive,
   loadSettlementReportData,
@@ -19,7 +20,7 @@ import {
   stylistSettlementListRows,
   type StylistFinancialPosition,
 } from "@/lib/salon/settlements";
-import { stylistById } from "@/lib/salon/management";
+import { chairRentUnitLabels, stylistById } from "@/lib/salon/management";
 import { formatJalaliShort } from "@/lib/format/jalali";
 import { formatPrice } from "@/lib/format";
 import { ApiError } from "@/lib/api/client";
@@ -60,8 +61,14 @@ export function SettlementsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const initialLoadDone = useRef(false);
+  // Input state — what the user has typed / picked
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  // Committed state — the period that the currently-loaded data matches.
+  // Only advances after a successful data load so rows never show a
+  // mismatched (scope × data) pair during a refresh.
+  const [loadedPeriodStart, setLoadedPeriodStart] = useState("");
+  const [loadedPeriodEnd, setLoadedPeriodEnd] = useState("");
   const [query, setQuery] = useState("");
   const [contractFilter, setContractFilter] = useState<ContractType | "all">(
     "all",
@@ -74,6 +81,22 @@ export function SettlementsPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(HISTORY_PAGE_SIZE);
   const [recordOpen, setRecordOpen] = useState(false);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
+
+  function selectStylist(stylistId: string) {
+    setSelectedStylistId(stylistId);
+    // Let the detail panel mount / layout expand, then ease the page down slightly.
+    window.setTimeout(() => {
+      const scroller = detailPanelRef.current?.closest(
+        ".overflow-y-auto",
+      ) as HTMLElement | null;
+      if (scroller) {
+        scroller.scrollBy({ top: 160, behavior: "smooth" });
+        return;
+      }
+      window.scrollBy({ top: 160, behavior: "smooth" });
+    }, 80);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +111,8 @@ export function SettlementsPage() {
       try {
         await loadSettlementReportData({ periodStart, periodEnd });
         if (cancelled) return;
+        setLoadedPeriodStart(periodStart);
+        setLoadedPeriodEnd(periodEnd);
         setRefreshKey((value) => value + 1);
       } catch (error) {
         if (!cancelled) {
@@ -114,31 +139,31 @@ export function SettlementsPage() {
   }, [periodStart, periodEnd]);
 
   const dateFilterActive = isSettlementDateFilterActive({
-    periodStart,
-    periodEnd,
+    periodStart: loadedPeriodStart,
+    periodEnd: loadedPeriodEnd,
   });
 
   const rows = useMemo(() => {
     void refreshKey;
     return stylistSettlementListRows({
-      periodStart,
-      periodEnd,
+      periodStart: loadedPeriodStart,
+      periodEnd: loadedPeriodEnd,
       query,
       contractType: contractFilter,
     });
-  }, [refreshKey, periodStart, periodEnd, query, contractFilter]);
+  }, [refreshKey, loadedPeriodStart, loadedPeriodEnd, query, contractFilter]);
 
   const selectedPosition = useMemo(() => {
     if (!selectedStylistId) return null;
     return stylistFinancialPosition(selectedStylistId, {
-      periodStart,
-      periodEnd,
+      periodStart: loadedPeriodStart,
+      periodEnd: loadedPeriodEnd,
       scopedToDateFilter: dateFilterActive,
     });
   }, [
     selectedStylistId,
-    periodStart,
-    periodEnd,
+    loadedPeriodStart,
+    loadedPeriodEnd,
     dateFilterActive,
     refreshKey,
   ]);
@@ -146,14 +171,14 @@ export function SettlementsPage() {
   const historyRows = useMemo(() => {
     if (!selectedStylistId) return [];
     return settlementHistoryRows(selectedStylistId, {
-      periodStart,
-      periodEnd,
+      periodStart: loadedPeriodStart,
+      periodEnd: loadedPeriodEnd,
       scopedToDateFilter: dateFilterActive,
     });
   }, [
     selectedStylistId,
-    periodStart,
-    periodEnd,
+    loadedPeriodStart,
+    loadedPeriodEnd,
     dateFilterActive,
     refreshKey,
   ]);
@@ -174,11 +199,11 @@ export function SettlementsPage() {
 
   useEffect(() => {
     setStylistPage(1);
-  }, [query, contractFilter, periodStart, periodEnd]);
+  }, [query, contractFilter, loadedPeriodStart, loadedPeriodEnd]);
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [selectedStylistId, periodStart, periodEnd]);
+  }, [selectedStylistId, loadedPeriodStart, loadedPeriodEnd]);
 
   useEffect(() => {
     if (
@@ -354,7 +379,7 @@ export function SettlementsPage() {
                           "cursor-pointer border-b border-border transition last:border-b-0 hover:bg-muted/30",
                           selectedStylistId === row.stylistId && "bg-primary/5",
                         )}
-                        onClick={() => setSelectedStylistId(row.stylistId)}
+                        onClick={() => selectStylist(row.stylistId)}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -423,7 +448,10 @@ export function SettlementsPage() {
         </Card>
 
         {selectedPosition ? (
-          <div className="absolute inset-x-0 bottom-0 z-10 flex max-h-[58vh] flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.12)]">
+          <div
+            ref={detailPanelRef}
+            className="absolute inset-x-0 bottom-0 z-10 flex max-h-[58vh] flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.12)]"
+          >
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div className="flex items-center gap-3">
                 <StylistAvatar
@@ -465,36 +493,30 @@ export function SettlementsPage() {
                 label="فروش آرایشگر"
                 value={formatPrice(selectedPosition.sales)}
               />
-              <SummaryCard
-                label="بدهکار (سالن)"
-                value={formatPrice(
-                  selectedPosition.contractType === "percentage"
-                    ? selectedPosition.cumulativePayable ?? selectedPosition.payable
-                    : selectedPosition.payable,
-                )}
+              <AccountBalanceCard
+                label="سالن"
+                isDebit={accountObligation(selectedPosition) > 0}
+                amount={Math.abs(accountObligation(selectedPosition))}
+              />
+              <AccountBalanceCard
+                label="آرایشگر"
+                isDebit={accountObligation(selectedPosition) < 0}
+                amount={Math.abs(accountObligation(selectedPosition))}
               />
               <SummaryCard
-                label="بستانکار (آرایشگر)"
-                value={formatPrice(
-                  selectedPosition.contractType === "percentage"
-                    ? selectedPosition.cumulativePayable ?? selectedPosition.payable
-                    : selectedPosition.receivable,
-                )}
-              />
-              <SummaryCard
-                label="ثبت‌شده"
+                label="تسویه‌شده"
                 value={formatPrice(selectedPosition.settledTotal)}
               />
               <SummaryCard
                 label="مانده"
                 value={formatPrice(Math.abs(selectedPosition.balance))}
-                highlight
-                tone={
-                  selectedPosition.balance === 0
-                    ? "neutral"
-                    : selectedPosition.balanceDirection === "salon_to_stylist"
-                      ? "payable"
-                      : "receivable"
+                tag={
+                  selectedPosition.balance !== 0
+                    ? balanceFavorLabel(selectedPosition.balance)
+                    : undefined
+                }
+                balanceTone={
+                  selectedPosition.balance <= 0 ? "settled" : "outstanding"
                 }
               />
             </div>
@@ -509,6 +531,7 @@ export function SettlementsPage() {
                     <thead className="border-b border-border bg-muted/30 text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 text-center font-medium">تاریخ</th>
+                        <th className="px-3 py-2 text-center font-medium">نوع</th>
                         <th className="px-3 py-2 text-center font-medium">جهت</th>
                         <th className="px-3 py-2 text-center font-medium">مبلغ</th>
                         <th className="px-3 py-2 text-center font-medium">روش</th>
@@ -521,48 +544,64 @@ export function SettlementsPage() {
                       {historyRows.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="px-3 py-8 text-center text-muted-foreground"
                           >
                             رکورد مالی ثبت نشده است.
                           </td>
                         </tr>
                       ) : (
-                        historyPageRows.map(({ record, methodLabel, balanceAfter }) => (
+                        historyPageRows.map((row) => (
                           <tr
-                            key={record.id}
+                            key={row.id}
                             className="border-b border-border last:border-b-0"
                           >
                             <td className="px-3 py-3">
-                              {formatJalaliShort(record.occurredAt)}
+                              {formatJalaliShort(row.occurredAt.slice(0, 10))}
+                            </td>
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              {row.bookingId ? (
+                                <Link
+                                  href={`/salon/bookings/${row.bookingId}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {row.kindLabel}
+                                </Link>
+                              ) : (
+                                row.kindLabel
+                              )}
                             </td>
                             <td className="px-3 py-3">
-                              <SettlementDirectionLabel
-                                direction={record.direction}
-                                className={
-                                  record.direction === "salon_to_stylist"
-                                    ? "text-emerald-700"
-                                    : "text-rose-700"
-                                }
-                                arrowClassName={
-                                  record.direction === "salon_to_stylist"
-                                    ? "text-emerald-600"
-                                    : "text-rose-600"
-                                }
-                              />
+                              {row.amount === 0 ? (
+                                "—"
+                              ) : (
+                                <SettlementDirectionLabel
+                                  direction={row.direction}
+                                  className={
+                                    row.direction === "salon_to_stylist"
+                                      ? "text-emerald-700"
+                                      : "text-rose-700"
+                                  }
+                                  arrowClassName={
+                                    row.direction === "salon_to_stylist"
+                                      ? "text-emerald-600"
+                                      : "text-rose-600"
+                                  }
+                                />
+                              )}
                             </td>
                             <td className="px-3 py-3">
-                              {formatPrice(record.amount)}
+                              {formatPrice(row.amount)}
                             </td>
-                            <td className="px-3 py-3">{methodLabel}</td>
+                            <td className="px-3 py-3">{row.methodLabel}</td>
                             <td className="px-3 py-3" dir="ltr">
-                              {record.referenceNumber ?? "—"}
+                              {row.referenceNumber ?? "—"}
                             </td>
                             <td className="px-3 py-3 text-muted-foreground">
-                              {record.notes ?? "—"}
+                              {row.description}
                             </td>
                             <td className="px-3 py-3 font-medium">
-                              {formatPrice(Math.abs(balanceAfter))}
+                              {formatPrice(Math.abs(row.balanceAfter))}
                             </td>
                           </tr>
                         ))
@@ -610,8 +649,9 @@ export function SettlementsPage() {
                         درآمد رزروها: {formatPrice(selectedPosition.bookingCredit)}
                       </p>
                       <p>
-                        اجاره ({selectedPosition.chairRentWorkingDays ?? 0} روز
-                        کاری × {formatPrice(selectedPosition.chairRentPerDay ?? 0)}
+                        اجاره ({selectedPosition.chairRentCharges ?? 0}{" "}
+                        {chairRentUnitLabels[selectedPosition.chairRentPeriod ?? "daily"]} ×{" "}
+                        {formatPrice(selectedPosition.chairRentRate ?? 0)}
                         ): {formatPrice(selectedPosition.receivable)}
                       </p>
                     </div>
@@ -691,6 +731,8 @@ export function SettlementsPage() {
           setSelectedStylistId(stylistId);
           try {
             await loadSettlementReportData({ periodStart, periodEnd });
+            setLoadedPeriodStart(periodStart);
+            setLoadedPeriodEnd(periodEnd);
             setRefreshKey((value) => value + 1);
           } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
@@ -712,49 +754,91 @@ function BalanceCell({ row }: { row: StylistFinancialPosition }) {
   if (row.balance === 0) {
     return <span className="text-muted-foreground">۰</span>;
   }
-  const positive = row.balance > 0;
+  const salonOwed = row.balance < 0;
   return (
     <span
       className={cn(
-        "font-medium",
-        positive ? "text-emerald-700" : "text-rose-700",
+        "inline-flex flex-wrap items-center justify-center gap-1.5 font-medium",
+        salonOwed ? "text-emerald-700" : "text-rose-700",
       )}
     >
       {formatPrice(Math.abs(row.balance))}
+      <span
+        className={cn(
+          "rounded-md px-1.5 py-0.5 text-[11px] font-medium",
+          salonOwed ? "bg-emerald-50" : "bg-rose-50",
+        )}
+      >
+        {balanceFavorLabel(row.balance)}
+      </span>
     </span>
+  );
+}
+
+/** Accrued balance before settlements; positive = salon owes the stylist. */
+function accountObligation(position: StylistFinancialPosition) {
+  return position.payable - position.receivable;
+}
+
+function AccountBalanceCard({
+  label,
+  isDebit,
+  amount,
+}: {
+  label: string;
+  isDebit: boolean;
+  amount: number;
+}) {
+  return (
+    <Card
+      className={cn(
+        "shadow-none",
+        isDebit && amount > 0 ? "border-red-500 bg-red-500/30" : "border-border",
+      )}
+    >
+      <CardContent className="space-y-2 py-4">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="flex flex-wrap items-baseline gap-2 text-lg font-bold">
+          {formatPrice(amount)}
+          {amount > 0 ? (
+            <span className="text-xs font-medium text-muted-foreground">
+              {isDebit ? "بدهکار" : "بستانکار"}
+            </span>
+          ) : null}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
 function SummaryCard({
   label,
   value,
-  highlight = false,
-  tone = "neutral",
+  tag,
+  balanceTone,
 }: {
   label: string;
   value: string;
-  highlight?: boolean;
-  tone?: "neutral" | "payable" | "receivable";
+  tag?: string;
+  /** مانده: ≤0 green, >0 red */
+  balanceTone?: "settled" | "outstanding";
 }) {
   const toneClass =
-    tone === "payable"
-      ? "border-emerald-200 bg-emerald-50"
-      : tone === "receivable"
-        ? "border-rose-200 bg-rose-50"
+    balanceTone === "settled"
+      ? "border-emerald-500 bg-emerald-500/20"
+      : balanceTone === "outstanding"
+        ? "border-red-500 bg-red-500/20"
         : "border-border";
 
   return (
-    <Card
-      className={cn(
-        "shadow-none",
-        toneClass,
-        highlight && "border-2 border-red-500",
-      )}
-    >
+    <Card className={cn("shadow-none", toneClass)}>
       <CardContent className="space-y-2 py-4">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={cn("text-lg font-bold", highlight && "text-foreground")}>
+        <p className="flex flex-wrap items-baseline gap-2 text-lg font-bold">
           {value}
+          {tag ? (
+            <span className="text-xs font-medium text-muted-foreground">{tag}</span>
+          ) : null}
         </p>
       </CardContent>
     </Card>

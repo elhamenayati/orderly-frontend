@@ -1,13 +1,21 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { SalonSidebar } from "@/components/shells/salon-sidebar";
 import { SalonTopHeader } from "@/components/shells/salon-top-header";
+import {
+  clearFiltersOutsideSection,
+  salonFilterSection,
+} from "@/lib/salon/persistent-filters";
 
 export function SalonShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const showNav = !pathname.startsWith("/salon/login");
+
+  useEffect(() => {
+    clearFiltersOutsideSection(salonFilterSection(pathname));
+  }, [pathname]);
 
   if (!showNav) {
     return (
