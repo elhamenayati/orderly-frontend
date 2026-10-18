@@ -8,10 +8,24 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Normalize to `…/api/v1` so a mis-set `https://host/api` (or bare origin)
+ * still hits the Go routes under `/api/v1/...`.
+ */
 export function getApiBaseUrl() {
-  const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const raw =
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    "";
   if (!raw) return "";
-  return raw.replace(/\/$/, "");
+
+  let base = raw.replace(/\/$/, "");
+  if (base.endsWith("/api/v1")) return base;
+  if (base.endsWith("/api")) return `${base}/v1`;
+  if (/^https?:\/\//i.test(base) && !base.includes("/api")) {
+    return `${base}/api/v1`;
+  }
+  return base;
 }
 
 export function isApiEnabled() {

@@ -5,7 +5,10 @@ function readFlag(value: string | undefined, fallback: boolean) {
 
 export const env = {
   appName: process.env.NEXT_PUBLIC_APP_NAME ?? "Abrinak",
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
+  apiBaseUrl:
+    process.env.NEXT_PUBLIC_API_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    "http://localhost:8080/api/v1",
   /** Guest/customer site (hub + booking). Local default: port 4000. */
   publicSiteUrl:
     process.env.NEXT_PUBLIC_PUBLIC_SITE_URL ?? "http://localhost:4000",
